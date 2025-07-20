@@ -1,8 +1,15 @@
 package main
 
 import (
+	"encoding/json"
+
 	"github.com/gorilla/websocket"
 )
+
+type Message struct {
+	Username string `json:"username"`
+	Message  string `json:"message"`
+}
 
 type Client struct {
 	hub  *Hub
@@ -17,20 +24,35 @@ func (c *Client) readPump() {
 	}()
 
 	for {
-		_, message, err := c.conn.ReadMessage()
+		_, rawMsg, err := c.conn.ReadMessage()
 		if err != nil {
 			break
 		}
-		c.hub.broadcast <- message
+
+		var m Message
+		if err := json.Unmarshal(rawMsg, &m); err != nil {
+			continue // skip invalid messages
+		}
+
+		formatted := []byte("[" + m.Username + "]: " + m.Message)
+		c.hub.broadcast <- formatted
 	}
 }
 
 func (c *Client) writePump() {
-	defer c.conn.Close()
+	for {
+		select {
+		case message, ok := <-c.send:
+			if !ok {
+				// Hub closed the channel
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
 
-	for msg := range c.send {
-		if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-			break
+			err := c.conn.WriteMessage(websocket.TextMessage, message)
+			if err != nil {
+				return
+			}
 		}
 	}
 }

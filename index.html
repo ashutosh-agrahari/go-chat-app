@@ -4,65 +4,80 @@
   <meta charset="UTF-8">
   <title>Go Chat</title>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 30px;
-      background: #f9f9f9;
-    }
-    #chat {
-      border: 1px solid #ccc;
-      padding: 10px;
-      height: 300px;
-      overflow-y: scroll;
-      background: white;
-      margin-bottom: 10px;
-    }
-    #message {
-      width: 70%;
-      padding: 10px;
-      font-size: 16px;
-    }
-    #send {
-      padding: 10px;
-      font-size: 16px;
-    }
+    body { font-family: sans-serif; margin: 30px; background: #f9f9f9; }
+    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; background: white; margin-bottom: 10px; }
+    #message, #username { padding: 10px; font-size: 16px; width: 70%; }
+    #send, #join { padding: 10px; font-size: 16px; }
   </style>
 </head>
 <body>
-  <h1>Go WebSocket Chat</h1>
-  <div id="chat"></div>
-  <input type="text" id="message" placeholder="Type a message..." />
-  <button id="send">Send</button>
+  <h1>Go Chat</h1>
+
+  <div>
+    <input type="text" id="username" placeholder="Enter your name" />
+    <button id="join">Join Chat</button>
+  </div>
+
+  <div id="chat" style="margin-top:20px;"></div>
+
+  <input type="text" id="message" placeholder="Type a message..." disabled />
+  <button id="send" disabled>Send</button>
 
   <script>
+    let socket;
+    let user = "";
+
     const chat = document.getElementById("chat");
+    const usernameInput = document.getElementById("username");
     const messageInput = document.getElementById("message");
+    const joinButton = document.getElementById("join");
     const sendButton = document.getElementById("send");
 
-    const socket = new WebSocket("ws://localhost:8080/ws");
-
-    socket.onopen = () => {
-      console.log("Connected to server");
-    };
-
-    socket.onmessage = (event) => {
-      const message = document.createElement("div");
-      message.textContent = event.data;
-      chat.appendChild(message);
-      chat.scrollTop = chat.scrollHeight;
-    };
-
-    sendButton.onclick = () => {
-      const msg = messageInput.value;
-      if (msg.trim() !== "") {
-        socket.send(msg);
-        messageInput.value = "";
+    joinButton.onclick = () => {
+      user = usernameInput.value.trim();
+      if (!user) {
+        alert("Please enter your name");
+        return;
       }
-    };
 
-    messageInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") sendButton.click();
-    });
+      socket = new WebSocket("ws://" + window.location.host + "/ws");
+
+      socket.onopen = () => {
+        console.log("Connected as", user);
+        usernameInput.disabled = true;
+        joinButton.disabled = true;
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+      };
+
+      socket.onmessage = (event) => {
+        const msg = document.createElement("div");
+        msg.textContent = event.data;
+        chat.appendChild(msg);
+        chat.scrollTop = chat.scrollHeight;
+      };
+
+      sendButton.onclick = () => {
+        const msg = messageInput.value.trim();
+        if (msg && socket.readyState === WebSocket.OPEN) {
+          const payload = JSON.stringify({ username: user, message: msg });
+          socket.send(payload);
+          messageInput.value = "";
+        }
+      };
+
+      messageInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") sendButton.click();
+      });
+
+      socket.onclose = () => {
+        console.log("Disconnected from server");
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        usernameInput.disabled = false;
+        joinButton.disabled = false;
+      };
+    };
   </script>
 </body>
 </html>
