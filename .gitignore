@@ -1,0 +1,15 @@
+# Go build files
+*.exe
+*.out
+*.test
+
+# Go modules cache
+vendor/
+go.sum
+
+# OS files
+.DS_Store
+
+# IDE/editor settings
+.vscode/
+.idea/
