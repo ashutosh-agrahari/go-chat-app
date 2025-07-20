@@ -1,8 +1,5 @@
 
-### 📄 `README.md`
-
-```markdown
-# Go Chat App
+### Go Chat App
 
 A real-time WebSocket-based chat application built using Golang and the Gorilla WebSocket package.  
 This application supports multi-client messaging and uses concurrency-safe `Hub` and `Client` structures with a minimal HTML/JavaScript frontend.
