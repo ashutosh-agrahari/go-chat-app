@@ -6,17 +6,21 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Message represents the format of incoming messages from the client.
 type Message struct {
 	Username string `json:"username"`
 	Message  string `json:"message"`
 }
 
+// Client represents a connected WebSocket user.
 type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 	send chan []byte
+	room string
 }
 
+// readPump listens for incoming WebSocket messages and routes them to the hub.
 func (c *Client) readPump() {
 	defer func() {
 		c.hub.unregister <- c
@@ -26,31 +30,34 @@ func (c *Client) readPump() {
 	for {
 		_, rawMsg, err := c.conn.ReadMessage()
 		if err != nil {
-			break
+			break // client disconnected
 		}
 
-		var m Message
-		if err := json.Unmarshal(rawMsg, &m); err != nil {
-			continue // skip invalid messages
+		var msg Message
+		if err := json.Unmarshal(rawMsg, &msg); err != nil {
+			continue // ignore malformed input
 		}
 
-		formatted := []byte("[" + m.Username + "]: " + m.Message)
-		c.hub.broadcast <- formatted
+		formatted := []byte("[" + msg.Username + "]: " + msg.Message)
+
+		c.hub.broadcast <- RoomMessage{
+			room:    c.room,
+			message: formatted,
+		}
 	}
 }
 
+// writePump sends messages from the hub to the client's WebSocket.
 func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
 			if !ok {
-				// Hub closed the channel
+				// Channel closed, close socket
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
-			err := c.conn.WriteMessage(websocket.TextMessage, message)
-			if err != nil {
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
 		}

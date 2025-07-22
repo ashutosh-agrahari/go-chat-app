@@ -4,10 +4,38 @@
   <meta charset="UTF-8">
   <title>Go Chat</title>
   <style>
-    body { font-family: sans-serif; margin: 30px; background: #f9f9f9; }
-    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; background: white; margin-bottom: 10px; }
-    #message, #username { padding: 10px; font-size: 16px; width: 70%; }
-    #send, #join { padding: 10px; font-size: 16px; }
+    body {
+      font-family: sans-serif;
+      margin: 30px;
+      background: #f9f9f9;
+    }
+
+    #chat {
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 300px;
+      overflow-y: scroll;
+      background: white;
+      margin-bottom: 10px;
+    }
+
+    #message, #username, #room {
+      padding: 10px;
+      font-size: 16px;
+      width: 65%;
+      margin-top: 10px;
+    }
+
+    #send, #join {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-style: italic;
+      color: gray;
+    }
   </style>
 </head>
 <body>
@@ -15,10 +43,13 @@
 
   <div>
     <input type="text" id="username" placeholder="Enter your name" />
+    <input type="text" id="room" placeholder="Enter room name" />
     <button id="join">Join Chat</button>
   </div>
 
-  <div id="chat" style="margin-top:20px;"></div>
+  <div id="status"></div>
+
+  <div id="chat"></div>
 
   <input type="text" id="message" placeholder="Type a message..." disabled />
   <button id="send" disabled>Send</button>
@@ -26,28 +57,41 @@
   <script>
     let socket;
     let user = "";
+    let room = "";
 
     const chat = document.getElementById("chat");
     const usernameInput = document.getElementById("username");
+    const roomInput = document.getElementById("room");
     const messageInput = document.getElementById("message");
     const joinButton = document.getElementById("join");
     const sendButton = document.getElementById("send");
+    const status = document.getElementById("status");
 
     joinButton.onclick = () => {
       user = usernameInput.value.trim();
+      room = roomInput.value.trim();
+
       if (!user) {
         alert("Please enter your name");
         return;
       }
 
-      socket = new WebSocket("ws://" + window.location.host + "/ws");
+      if (!room) {
+        alert("Please enter a room name");
+        return;
+      }
+
+      socket = new WebSocket(`ws://${window.location.host}/ws?room=${room}`);
 
       socket.onopen = () => {
         console.log("Connected as", user);
         usernameInput.disabled = true;
+        roomInput.disabled = true;
         joinButton.disabled = true;
         messageInput.disabled = false;
         sendButton.disabled = false;
+        status.textContent = `Connected to room: ${room}`;
+        chat.innerHTML = ""; // clear previous chat
       };
 
       socket.onmessage = (event) => {
@@ -55,6 +99,16 @@
         msg.textContent = event.data;
         chat.appendChild(msg);
         chat.scrollTop = chat.scrollHeight;
+      };
+
+      socket.onclose = () => {
+        console.log("Disconnected from server");
+        status.textContent = "Disconnected";
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        usernameInput.disabled = false;
+        roomInput.disabled = false;
+        joinButton.disabled = false;
       };
 
       sendButton.onclick = () => {
@@ -69,14 +123,6 @@
       messageInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") sendButton.click();
       });
-
-      socket.onclose = () => {
-        console.log("Disconnected from server");
-        messageInput.disabled = true;
-        sendButton.disabled = true;
-        usernameInput.disabled = false;
-        joinButton.disabled = false;
-      };
     };
   </script>
 </body>
